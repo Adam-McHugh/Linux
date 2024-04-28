@@ -1,0 +1,27 @@
+Arch Linux manual install utilising LVM and disk encryption. Can add extra drives-physical volumes to the volume group to increase space.
+
+partition new disk to LVM fdisk /dev/sdb
+
+n
+
+p
+
+1
+
+first sector enter
+
+last sector enter
+
+t
+
+8e Linux LVM
+
+w
+
+Create physical volume pvcreate /dev/sdb1
+
+show what pv are assigned to. pvs
+
+We are going to add /dev/sdb1 into the existing VG called volgroup0 by using the vgextend command vgextend volgroup0 /dev/sdb1
+
+lvextend -l +100%FREE -r /dev/volgroup0/lv_home
