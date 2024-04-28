@@ -1,0 +1,191 @@
+Arch Linux - manual method with LVM
+
+Network Connection.
+  ip addr show
+
+# for wifi.
+  iwctl
+  station wlan0 get-networks # lists all wifi networks in area.
+  exit
+  iwctl –passphrase “wifi password” station wlan0 connect ssid name
+  ip addr show
+
+Creating Disk Partitions LVM on 3
+  lsblk
+  fdisk /dev/sda 
+  p 	#prints current partition layout
+  g	#empty partition table 
+  n 	#create new partition
+  1	#default partition number
+  Enter 	#default first sector selection
+  Enter 	#default last sector selection
+  +1G 	#create 1 Gigabyte partition for partition 1
+  Do you want to remove the signature = Y
+
+NOW TO CREATE SECOND PARTITION.
+  n	#create new partition 
+  enter 	#default partition now 2
+  enter 	#default first sector
+  +1G	#last sector partition size 1 Gigabyte 
+
+NOW TO CREATE THIRD PARTITION.
+  n	#create new partition 
+  enter 	#default partition now 3
+  enter 	#default first sector
+  enter	#last sector partition size rest of disk space
+  t 	#type of partition 3
+  44 	#change partition type to “Linux LVM”
+  w 	#write changes to disk – no going back now
+
+FORMAT PARTITIONS
+  Formatting the first partition in fat 32.
+  mkfs.fat -F32 /dev/sda1
+
+  Formatting the second partition in ext4.
+  mkfs.ext4 /dev/sda2 
+
+  encrypting third partition where personal files will be stored.
+  cryptsetup luksFormat	 /dev/sda3
+  are you sure. YES
+
+  #enter passphrase to unlock computer every time it starts
+  “************”
+  Verify passphrase.
+  “*************”
+  cryptsetup open --type luks /dev/sda3 lvm
+  #Enter passphrase.
+  
+Create physical volume.
+  pvcreate /dev/mapper/lvm
+
+Create volume group.
+  vgcreate volgroup0 /dev/mapper/lvm
+
+Create Logical volume.
+  lvcreate -L 30GB volgroup0 -n lv_root
+  lvcreate -l 100%FREE volgroup0 -n lv_home 
+
+Display logical group.
+  vgdisplay
+
+Display logical volumes.
+  lvdisplay
+
+Inset kernel module.
+  modprobe dm_mod
+  vgscan
+activate all volume groups.
+  vgchange -ay
+
+Format logical volume.
+  mkfs.ext4 /dev/volgroup0/lv_root
+  mkfs.ext4 /dev/volgroup0/lv_home
+
+MOUNT
+  mount /dev/volgroup0/lv_root /mnt
+  mkdir /mnt/boot
+  mount /dev/sda2 /mnt/boot
+  mkdir /mnt/home
+  mount /dev/volgroup0/lv_home /mnt/home
+
+INSTALL base packages
+  pacstrap -i /mnt base
+  enter accept install packages
+
+Generate fstab file for mounting partitions at boot time
+  genfstab -U -p /mnt >> /mnt/etc/fstab
+
+Check that root, boot and home are listed correctly.
+cat /mnt/etc/fstab 
+
+Log in to in progress installation of arch do not restart yet.
+arch-chroot /mnt
+
+Set root password for root
+  passwd 
+  enter password.
+  enter password.
+
+Creating user.
+  useradd -m -g users -G wheel mchugh
+  passwd mchugh
+  enter password.
+  enter password.
+
+install additional packages. 
+  pacman -S base-devel dosfstools grub efibootmgr gnome gnome-tweaks xorg plasma plasma-workspace kde-applications lvm2 mtools nano networkmanager openssh os-prober sudo
+  enter
+  enter
+
+Enable ssh
+  systemctl enable sshd
+
+Install linux kernal
+  pacman -S linux linux-headers linux-lts linux-lts-headers
+  enter
+  enter
+  pacman -S linux-firmware
+  enter
+  enter
+
+
+Video card driver
+  lists PCI devices
+  lspci
+
+intel graphics card
+  pacman -S mesa
+intel GPU hardware decoding
+  pacman -S intel-media-driver 
+
+AMD cards
+  pacman -S mesa
+AMD hardware decoding GPU
+  pacman -S libva-mesa-driver 
+
+For nvidia cards
+  pacman -S nvidia nvidia-utils nvidia-lts 
+	
+Edit config file
+  nano /etc/mkinitcpio.conf #OPEN FILE
+  in file section HOOKS add in between block encrypt lvm2 filesystems line.
+
+Generating kernal 
+  mkinitcpio -p linux
+  mkinitcpio -p linux-lts
+
+Set locale 
+  nano /etc/locale.gen
+  #Uncomment your locale
+  locale-gen
+
+Edit grub file
+  nano /etc/default/grub
+  #line 
+  GRUB_CMDLINE_LINUX_DEFAULT=”loglevel=3 cryptdevice=/dev/sda3:volgroup0 quiet”
+
+Mount efi partition
+  mkdir /boot/EFI
+  mount /dev/sda1 /boot/EFI
+
+install grub bootloader
+  grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
+
+copy file into boot directory
+  cp /usr/share/locale/en\@quot/LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
+  generate config file for boot loader
+  grub-mkconfig -o /boot/grub/grub.cfg
+
+Enable GDM or SDDM
+  #enable gdm
+  systemctl enable gdm
+
+  #enable sddm
+  systemctl enable sddm.service
+
+Enable network manager.
+  systemctl enable NetworkManager.service
+  exit
+
+unmount -a
+reboot
