@@ -1,0 +1,45 @@
+GENERAL USEFUL PACKAGES.
+  pacman -S Arch linux package manager.
+
+Linux
+  linux linux-lts
+  linux-headers: Interface needed to talk to the kernel.
+  linux-firmware
+
+CPU
+  intel-ucode: Stability and security updates for the processor.
+  amd-ucode
+
+Desktop 
+  Xorg: Open-source implementation of the X Window System.
+  plasma, plasma-workspace, kde-applications
+
+AMD Video Drivers
+  mesa libva-mesa-driver mesa-vdpau vulkan-radeon
+
+Intel Video Drivers
+  mesa intel-media-driver
+
+Nvidia Video Drivers
+  nvidia nvidia-utils nvidia-lts
+
+Bluetooth
+  bluez-utils
+
+Text editors
+  Vim nano
+
+Other packages
+  networkmanager
+  mkinitcpio-numlock: Enable number-lock 
+  LVM2: Logical Volume Manager – Disk management and partitioning tool
+  sudo
+  base-devel: Basic tools to build Arch Linux packages.
+  Dosfstools: Package contains utilities for the FAT family file systems.
+  Grub: bootloader uses (MBR) Master Boot Record. 
+  Eifbootmgr: Linux command line utility manages UEFI boot menu.
+  Mtools: Collection of utilities to access MS-DOS disks without mounting them. 
+  Openssh: Connectivity tool for remote login with the SSH protocol. Encrypts traffic.
+  os-prober: Detect other OSes on a set of drives
+
+
