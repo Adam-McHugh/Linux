@@ -1,4 +1,4 @@
-Arch Linux - manual method with LVM
+Arch Linux - manual method with LVM GRUB boot loader and encrypt "luks"
 
 Network Connection.
   ip addr show
