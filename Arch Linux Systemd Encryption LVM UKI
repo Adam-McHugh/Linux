@@ -1,0 +1,233 @@
+#Arch LVM LUKS SYSTEMD NVMe Working VMware Workstation 01 August 2025#
+
+###Clearing nvme###
+nvme -s1 /dev/nvme01n1
+
+###Checking in UEFI mode###
+ls /sys/firmware/efi/efivars/
+
+###Time Sync###
+timedatectl set-ntp true
+
+###disk partitioning###
+cfdisk /dev/nvme0n1
+1 EFI part 1G
+2 LVM all
+
+###Set filesystem on EFI partition###
+mkfs.fat -F 32 /dev/nvme0n1p1
+
+###Encrypting nvme partition###
+cryptsetup luksFormat /dev/nvme0n1p2
+
+YES
+passphrase
+
+cryptsetup open /dev/nvme0n1p2 cryptLVM
+
+###Creating LVM ###
+pvcreate /dev/mapper/cryptLVM
+
+vgcreate archVolume /dev/mapper/cryptLVM
+
+lvcreate -L 20G archVolume -n swap
+lvcreate -L 80G archVolume -n root
+lvcreate -l 100%FREE archVolume -n home
+
+modprobe dm-mod
+vgscan
+vgchange -ay
+
+###Filesystem of LVM ###
+
+mkfs.ext4 /dev/archVolume/root
+mkfs.ext4 /dev/archvolume/home
+mkswap /dev/archVolume/swap
+swapon /dev/archVolume/swap
+
+###Mounting###
+
+mount /dev/archVolume/root /mnt
+mkdir /mnt/home
+mount /dev/archVolume/home /mnt/home
+
+mkdir /mnt/efi
+mount /dev/nvme0n1p1 /mnt/efi
+
+lsblk -f
+
+###Setting mirrorlist to country size and speed using https protocol###
+reflector --verbose --country "Australia" --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+
+###Install base linux kernel to /mnt###
+pacstrap /mnt base linux linux-firmware linux-headers intel-ucode linux-lts linux-lts-headers
+
+genfstab -U /mnt >> /mnt/etc/fstab
+
+vim /mnt/etc/fstab
+
+**change nvme0n1p1(efi) fmask to 0137 dmask 0027**
+
+###Enter and configure Linux system###
+arch-chroot /mnt
+
+pacman -S nano vim lvm2
+
+###Location config###
+ln -sf /usr/share/zoneinfo/Australia/Melbourne /etc/localtime
+vim /etc/locale.gen
+uncomment en_AU UTF-8
+echo "LANG=en_AU.UTF-8" >> /etc/locale.conf
+echo "arch" >> /etc/hostname
+locale-gen
+
+
+###localhost config###
+vim /etc/hosts
+127.0.0.1	localhost
+::1		localhost
+127.0.1.1	arch.localdomain	arch
+*save*
+
+###mkinitcpio.conf edit###
+vim /etc/mkinitcpio.conf
+
+HOOKS=(systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt lvm2 filesystems fsck)
+
+passwd
+*****
+******
+
+###Install systemd bootloader###
+bootctl install
+
+vim /efi/loader/loader.conf
+
+default 	arch-linux.efi
+timeout 	4
+console-mode 	auto
+editor 		no
+*save*
+
+###Configure boot file to access crypt device###
+vim /etc/kernel/cmdline  (will be new/empty file)
+*need uuid of sda2 partition crypt partition*
+:read !blkid
+
+*End 1 line below*
+rd.luks.name=adasdaldadkd=cryptLVM root=/dev/archVolume/root rw quiet bgrt_disable
+*save*
+
+###Create Unified Kernel Image###
+*Create UKI Unified Kernel image*
+
+vim /etc/mkinitcpio.d/linux.preset
+
+# mkinitcpio preset file for the 'linux' package
+
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="/boot/vmlinuz-linux"
+
+#PRESETS=('default' 'fallback')
+PRESETS=('default')
+
+#default_config="/etc/mkinitcpio.conf"
+#default_image="/boot/initramfs-linux.img"
+default_uki="/efi/EFI/Linux/arch-linux.efi"
+default_option="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
+
+#fallback_config="etc/mkinitcpio.conf"
+#fallack_image="/boot/initramfs-linux-falback.img"
+fallback_uki="/efi/EFI/Linux/arch-linux-fallback.efi"
+fallback_options="-S autodetect"
+*save*
+
+###Regenerate mkinitcpio and enable systemd boot###
+mkinitcpio-P
+
+systemctl enable systemd-boot-update.service
+
+bootctl update
+
+###At this point you could setup secure boot with sbctl on arch wiki for instructions skipping now###
+
+###Edit pacman###
+vim /etc/pacman.conf
+
+Turn on multilib
+colors
+parallel downloads 5
+*save*
+
+pacman -Sy
+
+###laptop battery life###
+pacman -S tlp (good for laptop battery life)
+systemctl enable tlp.service
+systemctl mask systemd-rfkill.socket
+systemctl mask systemd-rfkill.service
+
+### AMD Video drivers###
+xf86-video-amdgpu
+xf86-video-ati
+xf86-video-nouveau
+mesa
+mesa-vdpau
+vulkan-radeon
+vulkan-nouveau
+libva-mesa-driver
+lib32-mesa
+lib32-mesa-vdpau
+lib32-vulkan-radeon
+lib32-libva-mesa-driver
+xorg-server
+xorg-xinit
+
+###Task scheduler###
+pacman -S cronie
+systemctl enable cronie.service
+
+###Other packages###
+pacman -S 
+base-devel 
+dosfstools 
+efibootmgr 
+xorg 
+plasma-meta 
+plasma-workspace 
+kde-applications 
+mtools 
+networkmanager 
+openssh 
+os-prober 
+print-manager 
+system-config-printer 
+bluez 
+bluez-utils 
+bluez-deprecated-tools 
+cups 
+cups-pdf 
+pipewire 
+sddm 
+networkmanager-openvpn 
+firefox
+
+###Enable services###
+systemctl enable sddm.service
+systemctl enable NetworkManager.service
+systemctl enable bluetooth.service
+systemctl enable cups.service
+systemctl eable avahi-daemon.service
+systemctl enable sshd
+
+###Add user###
+useradd -m -g users -G wheel McHugh
+passwd McHugh
+
+visudo
+uncomment wheel group
+
+###umount and reboot###
+exit
+umount -R /mnt
+reboot
